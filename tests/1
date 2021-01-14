@@ -1,0 +1,9 @@
+program HEXandOUT;
+const A =  11;
+      B = $11;
+      C = &11;
+begin
+  writeln(A);
+  writeln(B);
+  writeln(C);
+end.
