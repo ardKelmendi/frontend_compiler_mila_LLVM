@@ -46,9 +46,9 @@ int main (int argc, char *argv[]) {
     
     BinopPrecedence['*'] = 40;
     BinopPrecedence['/'] = 40; // highest.
-
-    fprintf(stderr, "ready> ");
-    for (int i = 0; i < 4; i++) /// !!!!!!!!!!!!!!!! FOR PROGRAM NAME WHICH IS GARBAGE
+ 
+    // eat 'program' 'name' ';'
+    for (int i = 0; i < 4; i++) 
         getNextToken();
 
     InitializeModuleAndPassManager();
@@ -134,8 +134,6 @@ int main (int argc, char *argv[]) {
     // outs() << "Wrote " << Filename << "\n";
 
     system("clang  output.o fce.c -o output.out");
-
-    std::cout << "===============aftermain============\n";
 
     return 0;
 
