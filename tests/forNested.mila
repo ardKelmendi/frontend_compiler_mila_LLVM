@@ -1,0 +1,8 @@
+program forNested;
+begin
+    for i := 1 to 4 do begin
+        for j := 1 to 2 do begin
+            writeln(i);
+        end;
+    end;
+end. 

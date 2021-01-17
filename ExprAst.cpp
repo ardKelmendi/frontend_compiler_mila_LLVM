@@ -54,7 +54,7 @@ AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
                                           StringRef VarName) {
   IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
                    TheFunction->getEntryBlock().begin());
-  return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
+  return TmpB.CreateAlloca(Type::getInt32Ty(*TheContext), nullptr, VarName);
 }
 
 bool ExprAST::createGlobal() { return true; }
@@ -97,7 +97,6 @@ Value *BinaryExprAST::codegen() {
       return nullptr;
 
     // Look up the name.
-
     if (constantVals.find(LHSE->getName()) != constantVals.end()) {
       return LogErrorV("no constants");
     }
@@ -142,7 +141,7 @@ Value *BinaryExprAST::codegen() {
     case tok_greaterequal:
         L = Builder->CreateICmpSGE(L, R, "gecmptmp");
         return Builder->CreateIntCast(L, Type::getInt32Ty(*TheContext), true, "booltmp");
-    case '==':
+    case tok_eq:
         L = Builder->CreateICmpEQ(L, R, "lttmp");
         return Builder->CreateIntCast(L, Type::getInt32Ty(*TheContext), true, "booltmp");
     case tok_notequal:
@@ -159,6 +158,25 @@ Value *BinaryExprAST::codegen() {
 
   Value *Ops[2] = { L, R };
   return Builder->CreateCall(F, Ops, "binop");
+}
+
+// create writeln function
+void writelnFunction(){
+  // std::vector<Type*> Ints(1, Type::getInt32Ty(MilaContext));
+  std::vector<Type*> Ints(1, Type::getInt32Ty(*TheContext));
+  FunctionType * FT = FunctionType::get(Type::getInt32Ty(*TheContext), Ints, false);
+  Function * F = Function::Create(FT, Function::ExternalLinkage, "writeln", TheModule.get());
+  for (auto & Arg : F->args())
+      Arg.setName("x");
+}
+
+void readlnFunction() {
+    std::vector<Type *> Ints(1, Type::getInt32PtrTy(*TheContext));
+    FunctionType * FT = FunctionType::get(Type::getInt32Ty(*TheContext), Ints, false);
+    Function * F = Function::Create(FT, Function::ExternalLinkage, "readln", TheModule.get());
+    // Set names for all arguments.
+    for (auto & Arg : F->args())
+        Arg.setName("x");
 }
 
 Value *CallExprAST::codegen() {
@@ -353,87 +371,89 @@ Value *IfExprAST::codegen() {
 }
 // TODO
 Value *ForExprAST::codegen() {
-  Function *TheFunction = Builder->GetInsertBlock()->getParent();
+    Function * TheFunction = Builder->GetInsertBlock()->getParent();
 
-  // Create an alloca for the variable in the entry block.
-  AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
+    // Create an alloca for the variable in the entry block.
+    AllocaInst * Alloca = CreateEntryBlockAlloca(TheFunction, VarName);
 
-  // Emit the start code first, without 'variable' in scope.
-  Value *StartVal = Start->codegen();
-  if (!StartVal)
-    return nullptr;
+    // Emit the start code first, without 'variable' in scope.
+    Value * StartVal = Start->codegen();
+    if (!StartVal)
+        return nullptr;
 
-  // Store the value into the alloca.
-  Builder->CreateStore(StartVal, Alloca);
+    // Store the value into the alloca.
+    Builder->CreateStore(StartVal, Alloca);
 
-  // Make the new basic block for the loop header, inserting after current
-  // block.
-  BasicBlock *LoopBB = BasicBlock::Create(*TheContext, "loop", TheFunction);
+    // Make the new basic block for the loop header, inserting after current
+    // block.
+    BasicBlock * LoopBB = BasicBlock::Create(*TheContext, "loop", TheFunction);
 
-  // Insert an explicit fall through from the current block to the LoopBB.
-  Builder->CreateBr(LoopBB);
+    // Insert an explicit fall through from the current block to the LoopBB.
+    Builder->CreateBr(LoopBB);
 
-  // Start insertion in LoopBB.
-  Builder->SetInsertPoint(LoopBB);
+    // Start insertion in LoopBB.
+    Builder->SetInsertPoint(LoopBB);
 
-  // Within the loop, the variable is defined equal to the PHI node.  If it
-  // shadows an existing variable, we have to restore it, so save it now.
-  AllocaInst *OldVal = NamedValues[VarName];
-  NamedValues[VarName] = Alloca;
+    // Within the loop, the variable is defined equal to the PHI node.  If it
+    // shadows an existing variable, we have to restore it, so save it now.
+    AllocaInst * OldVal = NamedValues[VarName];
+    NamedValues[VarName] = Alloca;
 
-  // Emit the body of the loop.  This, like any other expr, can change the
-  // current BB.  Note that we ignore the value computed by the body, but don't
-  // allow an error.
-  for (const auto & line : Body)
-    if (!line->codegen())
-      return nullptr;
+    // Emit the body of the loop.  This, like any other expr, can change the
+    // current BB.  Note that we ignore the value computed by the body, but don't
+    // allow an error.
+    for (const auto & body: Body) {
+        if (!body->codegen())
+            return nullptr;
+    }
+    // Emit the step value.
+    Value * StepVal = nullptr;
+    if (Step) {
+        StepVal = Step->codegen();
+        if (!StepVal)
+            return nullptr;
+    }
+    else {
+        // If not specified, use 1.0.
+        StepVal = ConstantInt::get(*TheContext, APInt(32, 1, true));
+    }
 
-  // Emit the step value.
-  Value *StepVal = nullptr;
-  if (Step) {
-    StepVal = Step->codegen();
-    if (!StepVal)
-      return nullptr;
-  } else {
-    // If not specified, use 1.0.
-    StepVal = ConstantInt::get(*TheContext, APInt(32, 1, true));
-  }
+    // Compute the end condition.
+    Value * EndCond = End->codegen();
+    if (!EndCond)
+        return nullptr;
 
-  // Compute the end condition.
-  Value *EndCond = End->codegen();
-  if (!EndCond)
-    return nullptr;
+    // Reload, increment, and restore the alloca.  This handles the case where
+    // the body of the loop mutates the variable.
+    Value * CurVar = Builder->CreateLoad(Alloca, VarName.c_str());
+    Value * NextVar;
+    if (to)
+        NextVar = Builder->CreateAdd(CurVar, StepVal, "nextvar");
+    else
+        NextVar = Builder->CreateSub(CurVar, StepVal, "nextvar");
 
-  // Reload, increment, and restore the alloca.  This handles the case where
-  // the body of the loop mutates the variable.
-  Value *CurVar = Builder->CreateLoad(Alloca, VarName.c_str());
-  Value *NextVar =  to ? 
-                    Builder->CreateAdd(CurVar, StepVal, "nextvar") 
-                  : 
-                    Builder->CreateSub(CurVar, StepVal, "nextvar");
-                  
-  Builder->CreateStore(NextVar, Alloca);
+    Builder->CreateStore(NextVar, Alloca);
 
-  // Convert condition to a bool by comparing non-equal to 0
-  EndCond = Builder->CreateICmpNE(EndCond, CurVar, "loopcond");
+    // Convert condition to a bool by comparing non-equal to 0.0.
+    EndCond = Builder->CreateICmpNE(EndCond, CurVar, "loopcond");
 
-  // Create the "after loop" block and insert it.
-  BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterloop", TheFunction);
+    // Create the "after loop" block and insert it.
+    BasicBlock * AfterBB = BasicBlock::Create(*TheContext, "afterloop", TheFunction);
 
-  // Insert the conditional branch into the end of LoopEndBB.
-  Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
+    // Insert the conditional branch into the end of LoopEndBB.
+    Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
 
-  // Any new code will be inserted in AfterBB.
-  Builder->SetInsertPoint(AfterBB);
+    // Any new code will be inserted in AfterBB.
+    Builder->SetInsertPoint(AfterBB);
 
-  // Restore the unshadowed variable.
-  if (OldVal)
-    NamedValues[VarName] = OldVal;
-  else
-    NamedValues.erase(VarName);
+    // Restore the unshadowed variable.
+    if (OldVal)
+        NamedValues[VarName] = OldVal;
+    else
+        NamedValues.erase(VarName);
 
-  // for expr always returns 0.
-  return Constant::getNullValue(Type::getInt32Ty(*TheContext));
+    // for expr always returns 0.0.
+    return Constant::getNullValue(Type::getInt32Ty(*TheContext));
 }
 
 Value *UnaryExprAST::codegen() {
@@ -493,7 +513,7 @@ bool /* GlobalVariable * */ VarExprAST::createGlobal(){
   for (const auto & v : VarNames){
     TheModule->getOrInsertGlobal(v.first, Builder->getInt32Ty());
     GlobalVariable *gVar = TheModule->getNamedGlobal(v.first);
-    gVar->setLinkage(GlobalValue::CommonLinkage);
+    gVar->setLinkage(GlobalValue::ExternalLinkage);
     gVar->setInitializer(ConstantInt::get(*TheContext, APInt(32, 0, true)));
   }
     // return gVar;
@@ -545,7 +565,7 @@ bool ConstExprAST::createGlobal(){
   for (const auto & v : VarNames){
     TheModule->getOrInsertGlobal(v.first, Builder->getInt32Ty());
     GlobalVariable *gVar = TheModule->getNamedGlobal(v.first);
-    gVar->setLinkage(GlobalValue::CommonLinkage);
+    gVar->setLinkage(GlobalValue::ExternalLinkage);
     ExprAST *Init = VarNames[varNo].second.get();
     if (Init){
       if(auto InitVal = Init->codegen()){

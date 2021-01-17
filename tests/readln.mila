@@ -1,0 +1,7 @@
+program readln;
+var n : integer;
+begin
+    readln(n);
+    n = n + 5;
+    writeln(n);
+end.

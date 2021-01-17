@@ -1,0 +1,9 @@
+program localVar;
+function foo()
+    var a : integer;
+    begin
+    a = 12;
+    end
+begin
+writeln(foo());
+end.    

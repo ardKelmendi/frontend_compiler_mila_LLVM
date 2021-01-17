@@ -9,6 +9,5 @@ int write(int x) {
     return 0;
 }
 int readln(int *x) {
-    scanf("%d", x);
-    return 0;
+    return scanf("%d", x);
 }

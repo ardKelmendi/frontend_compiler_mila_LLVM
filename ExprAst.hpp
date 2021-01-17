@@ -61,6 +61,9 @@ extern std::set<std::string> constantVals;
 Function *getFunction(std::string Name);
 AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, StringRef VarName);
 
+void writelnFunction();
+void readlnFunction();
+
 
 /// ExprAST - Base class for all expression nodes.
 class ExprAST {
@@ -171,6 +174,9 @@ public:
     : Cond(std::move(Cond)), Then(std::move(Then)), 
       Else(std::move(Else)) , isElse(isElse ) {}
   
+  IfExprAST(std::unique_ptr<ExprAST> Cond, std::vector<std::unique_ptr<ExprAST>> Then)
+    : Cond(std::move(Cond)), Then(std::move(Then)) {}
+
   Value *codegen() override;
 };
 

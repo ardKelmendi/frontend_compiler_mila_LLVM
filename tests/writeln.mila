@@ -1,0 +1,10 @@
+prograg procwriteln;
+procedure a () 
+begin
+    writeln(1);
+    writeln(1 + 1);
+    writeln(1 + 1 + 1);
+end
+begin
+    a();
+end.

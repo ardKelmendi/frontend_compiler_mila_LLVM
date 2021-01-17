@@ -1,0 +1,14 @@
+program fun;
+function foo(a : integer)
+begin
+    a = a + 2;
+    writeln(a);
+    a = a * 2;
+    writeln(a);
+    a = 99;
+end
+
+begin
+    foo(4);
+    writeln(foo(4));
+end.

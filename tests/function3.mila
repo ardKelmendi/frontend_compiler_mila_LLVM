@@ -1,0 +1,14 @@
+program recursion;
+function foo (a : integer) : integer;
+begin
+    if a > 1 then
+    begin
+        writeln(a);
+        foo(a-1);
+    end
+    else
+        writeln(1);
+end
+begin
+    foo(5);
+end.

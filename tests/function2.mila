@@ -1,0 +1,10 @@
+program functionCalls;
+function foo () begin 42 end
+function bar () begin foo(); end
+var n : integer;
+begin
+    writeln (bar());
+    writeln (foo());
+    n = foo () + bar();
+    writeln(n);
+end.

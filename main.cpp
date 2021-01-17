@@ -47,14 +47,15 @@ int main (int argc, char *argv[]) {
     BinopPrecedence['*'] = 40;
     BinopPrecedence['/'] = 40; // highest.
  
-    // eat 'program' 'name' ';'
-    for (int i = 0; i < 4; i++) 
-        getNextToken();
+    getNextToken(); // eat program
+    getNextToken(); // eat name
+    std::string programName = m_IdentifierStr;
+    getNextToken(); // eat ;
 
     InitializeModuleAndPassManager();
     // create writeln and readln functions
-    readln();
-    writeln();
+    readlnFunction();
+    writelnFunction();
 
     MainLoop();
 

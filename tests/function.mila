@@ -1,0 +1,5 @@
+program fun;
+function a () begin 12 end
+begin
+    writeln(a());
+end.

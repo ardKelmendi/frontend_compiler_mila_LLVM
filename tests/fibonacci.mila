@@ -1,0 +1,14 @@
+program fibonacci;
+var fib : integer;
+function fibonacci(n : integer) : integer;
+begin
+    if n < 2 then 
+        fib = n;
+    else
+        fib = fibonacci(n-1) + fibonacci(n-2);
+end   
+
+begin
+    writeln(fibonacci(8));
+    writeln(fibonacci(9));
+end.

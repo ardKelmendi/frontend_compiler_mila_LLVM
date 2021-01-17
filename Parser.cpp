@@ -54,9 +54,13 @@ int getNextToken() {
     return CurTok = gettok();
 }
 
-/// GetTokPrecedence - Get the precedence of the pending binary operator token.
+
+ /// GetTokPrecedence - Get the precedence of the pending binary operator token.
 int GetTokPrecedence() {
-  if (!isascii(CurTok))
+  // not asci or 2-character operator
+  if (!isascii(CurTok)  && CurTok != tok_notequal  && CurTok != tok_lessequal  
+                        && CurTok != tok_greaterequal  && CurTok != tok_assign 
+                        && CurTok != tok_or)
     return -1;
 
   // Make sure it's a declared binop.
@@ -100,6 +104,7 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
 
 /// numberexpr ::= number
 std::unique_ptr<ExprAST> ParseNumberExpr() {
+  // std::cout  << m_NumVal << " <- opc===============\n";
   auto Result = std::make_unique<NumberExprAST>(m_NumVal);
   getNextToken(); // consume the number
   return std::move(Result);
@@ -195,8 +200,8 @@ std::unique_ptr<ExprAST> ParseNumberExpr() {
   if (if_block && CurTok != tok_end)
     return LogError("expected end after begin (if block)");
   if (if_block) 
-    getNextToken(); // eat end
-  
+    getNextToken(); // eat end  
+
   bool isElse = false;
   if (CurTok == tok_else){
     isElse = true;
@@ -209,8 +214,7 @@ std::unique_ptr<ExprAST> ParseNumberExpr() {
                                         std::move(Else), isElse);
   }
 
-  return std::make_unique<IfExprAST>(std::move(Cond), std::move(thenBlock),
-                                      nullptr, isElse);
+  return std::make_unique<IfExprAST>(std::move(Cond), std::move(thenBlock));
 }
 
 /*
@@ -421,12 +425,12 @@ void HandleSequenceVars( std::vector<std::pair<std::string, std::unique_ptr<Expr
 }
 
 std::unique_ptr<ExprAST> ParseConstExpr(){
-  getNextToken(); // eat 'var'
+  getNextToken(); // eat 'const'
 
   std::vector<std::pair<std::string, std::unique_ptr<ExprAST>>> VarNames;
 
   if (CurTok != tok_identifier)
-    return LogError("expected identifier after 'var'");
+    return LogError("expected identifier after 'const'");
 
   while(1){
     if (CurTok != tok_identifier) break;
@@ -452,12 +456,12 @@ std::unique_ptr<ExprAST> ParseConstExpr(){
       // End of var list, exit loop.
       if (CurTok != ';')
         break;
-      getNextToken(); // eat the ','.
+      getNextToken(); // eat the ';'.
 
-      if (CurTok == tok_function || CurTok == tok_begin)
+      if (CurTok == tok_function || CurTok == tok_begin || CurTok == tok_var)
           break;
       if (CurTok != tok_identifier)
-          return LogError("expected identifier list after var");
+          return LogError("expected identifier list after var99");
   }
 
   return std::make_unique<ConstExprAST>(move(VarNames));
@@ -473,6 +477,7 @@ std::unique_ptr<ExprAST> ParseConstExpr(){
 ///   ::= forexpr
 ///   ::= varexpr
  std::unique_ptr<ExprAST> ParsePrimary() {
+
   switch (CurTok) {
     default:
       if (CurTok == tok_begin || CurTok == tok_end) return nullptr;
@@ -560,7 +565,7 @@ std::unique_ptr<ExprAST> ParseConstExpr(){
   bool isProcedure = false; // can be procedure of function
   if (CurTok == tok_procedure){
     isProcedure = true;
-    getNextToken(); // eat 'procedure' or 'function'
+    getNextToken(); // eat 'procedure' or 'forward'
   }
 
   if (CurTok != tok_identifier)
@@ -589,7 +594,6 @@ std::unique_ptr<ExprAST> ParseConstExpr(){
   if (CurTok != ')')
     return LogErrorP("Expected ')' in prototype");
 
-  // success.
   getNextToken(); // eat ')'.
 
   // : int 
@@ -615,15 +619,39 @@ std::unique_ptr<ExprAST> ParseConstExpr(){
   bool isProcedure = false;
   if (CurTok == tok_procedure)
     isProcedure = true;
-  getNextToken(); // eat program.
+  getNextToken(); // eat function.
   auto Proto = ParsePrototype();
   if (!Proto)
     return nullptr;
-  getNextToken(); // eat program name
-  if (CurTok != ';')
-    LogErrorP("expected ; after program");
-  if (CurTok == ':')
-    getNextToken(); // eat ;
+
+  // : int 
+  if (CurTok == ':'){
+    if (CurTok == ':')
+      getNextToken(); // eat :
+    else{
+      LogErrorP("Expected ':'");
+      return nullptr;
+    }
+    
+    if (CurTok == tok_integer) 
+      getNextToken(); // eat integer
+    else {
+      LogErrorP("Expected 'integer'");
+      return nullptr;
+    }
+  }
+
+  if (CurTok == ';')
+    getNextToken();
+  // if (CurTok == ':')
+    // getNextToken(); // eat ;
+
+  if (m_IdentifierStr == "forward"){
+    getNextToken(); // eat forward/
+    if (CurTok == ';')
+      getNextToken(); // eat ;
+    return nullptr;
+  }
 
   if (CurTok != tok_begin && CurTok != tok_var) {
     LogErrorP("Expected begin");
@@ -665,9 +693,9 @@ std::unique_ptr<ExprAST> ParseConstExpr(){
   return nullptr;
 }
 
-/// external ::= 'extern' prototype
- std::unique_ptr<PrototypeAST> ParseExtern() {
-  getNextToken(); // eat extern.
+/// external ::= 'forward' prototype
+ std::unique_ptr<PrototypeAST> ParseForward() {
+  getNextToken(); // eat forward.
   return ParsePrototype();
 }
 
@@ -705,9 +733,9 @@ void HandleDefinition() {
   if (auto FnAST = ParseDefinition()) {
     if (auto *FnIR = FnAST->codegen()) {
       fprintf(stderr, "Read function definition:");
-      FnIR->print(errs());
-      fprintf(stderr, "\n");
-      InitializeModuleAndPassManager();
+      // FnIR->print(errs());
+      // fprintf(stderr, "\n");
+      // InitializeModuleAndPassManager();
     }
   } else {
     // Skip token for error recovery.
@@ -715,13 +743,13 @@ void HandleDefinition() {
   }
 }
 
- void HandleExtern() {
-  if (auto ProtoAST = ParseExtern()) {
+ void HandleForward() {
+  if (auto ProtoAST = ParseForward()) {
     if (auto *FnIR = ProtoAST->codegen()) {
       fprintf(stderr, "Read extern: ");
-      FnIR->print(errs());
-      fprintf(stderr, "\n");
-       FunctionProtos[ProtoAST->getName()] = std::move(ProtoAST);
+      // FnIR->print(errs());
+      // fprintf(stderr, "\n");
+      //  FunctionProtos[ProtoAST->getName()] = std::move(ProtoAST);
     }
   } else {
     // Skip token for error recovery.
@@ -749,7 +777,7 @@ void HandleDefinition() {
 void HandleVarGlobal(){
   if (auto FnAST = ParseVarExpr()) {
     if (auto result = FnAST->createGlobal()) {
-        fprintf(stderr, "Read function definition\n");
+        fprintf(stderr, "Read Var definition\n");
           //  TheModule->print(errs(), nullptr);
           //  fprintf(stderr, "\n");
     }
@@ -762,22 +790,20 @@ void HandleVarGlobal(){
 
 void HandleConstVal(){
  if (auto FnAST = ParseConstExpr()) {
-        if (auto result = FnAST->createGlobal()) {
-            fprintf(stderr, "Read function definition\n");
-          //  TheModule->print(errs(), nullptr);
-          //  fprintf(stderr, "\n");
-        }
+    if (auto result = FnAST->createGlobal()) {
+        fprintf(stderr, "Read Const definition\n");
+      //  TheModule->print(errs(), nullptr);
+      //  fprintf(stderr, "\n");
     }
-    else {
-        // Skip token for error recovery.
-        getNextToken();
-    }
+  } else {
+    // Skip token for error recovery.
+    getNextToken();
+  }
 }
 
 /// top ::= definition | external | expression | ';'
 void MainLoop() {
   while (true) {
-    fprintf(stderr, "ready> ");
     switch (CurTok) {
     case tok_eof:
       return;
@@ -789,6 +815,9 @@ void MainLoop() {
       break;
     case tok_procedure:
       HandleDefinition();
+      break;  
+    case tok_forward:
+      HandleForward();
       break;  
     case tok_var:
       HandleVarGlobal();

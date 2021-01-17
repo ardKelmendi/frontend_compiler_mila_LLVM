@@ -1,0 +1,7 @@
+program twoCharCompare;
+var n : integer;
+begin
+    n = 2;
+    if n <= 10 then writeln(10);
+    else writeln(11);
+end.

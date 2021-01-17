@@ -1,0 +1,8 @@
+Program if;
+procedure iffun (n : integer) 
+begin
+   if n >= 2 then writeln(2); else writeln(1);
+end
+begin
+   iffun(7); 
+end.

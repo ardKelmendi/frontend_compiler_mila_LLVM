@@ -39,6 +39,8 @@ int gettok() {
             return tok_integer;
         if (m_IdentifierStr == "exit")
             return tok_exit;
+        if (m_IdentifierStr == "forward")
+            return tok_forward;
         if (m_IdentifierStr == "if")
             return tok_if;
         if (m_IdentifierStr == "then")
@@ -133,6 +135,9 @@ int gettok() {
             }else if(expressionStr == "||")   {
                 LastChar = getchar();
                 return tok_or;
+            }else if(expressionStr == "==")   {
+                LastChar = getchar();
+                return tok_eq;
             }
         }
     }

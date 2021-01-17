@@ -47,6 +47,7 @@ enum Token {
     tok_greaterequal =  -22,
     tok_assign =        -23,
     tok_or =            -24,
+    tok_eq =            -25,
 
     // 3-character operators (keywords)
     tok_mod =           -25,
